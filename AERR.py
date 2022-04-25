@@ -16,6 +16,7 @@ plt.rcParams['axes.unicode_minus'] = False  #
 
 def getdata() :
     x = np.loadtxt("./data/train_features.txt", delimiter=",")
+    # print(x.shape)
     y = np.loadtxt("./data/train_labels.txt", delimiter=',')
     x_pd = np.loadtxt("./data/test_features.txt", delimiter=',')
 
@@ -97,9 +98,15 @@ class AER(nn.Module) :
 
         y_hat = torch.sum(hat, dim=1)
         z2 = self.Decoder(hat)
+        z1 = self.Decoder(h)
 
-        return y_hat, y, z2
+        return y_hat, y, z1, z2, h
 
+    def predict_scale(self, h) :
+        hat = self.Encoder_pd(h)
+
+        y_hat = torch.sum(hat, dim=1)
+        return h, y_hat
         pass
 
 
@@ -112,7 +119,7 @@ def Training(
         model_num=1
         ) :
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    if not torch.cuda.is_available():
+    if not torch.cuda.is_available() :
         print("PLZ use GPU machine for not demaging your PC")
     # print(device)
     x_train = torch.from_numpy(x_train)
@@ -146,9 +153,11 @@ def Training(
                 train_x = train_x.cuda()
                 train_y = train_y.cuda()
 
-                y_hat, y_bar, z1 = Net(train_x)
+                y_hat, y_bar, z1, z2, _ = Net(train_x)
                 lss = loss1(y_bar, train_y[:, 0]) + loss2(
                         train_x, z1
+                        ) + loss2(
+                        train_x, z2
                         ) + loss1(y_hat, train_y[:, 1])  # pred-loss + re-loss
                 # lss =  loss2(
                 #         train_x, z
@@ -176,7 +185,7 @@ def Training(
             # epoch_loss += lss_pd.item()
 
             with torch.no_grad() :
-                y_test_hat, y_test_bar, _, = Net(x_test)
+                y_test_hat, y_test_bar, _, _, _ = Net(x_test)
                 y_test_bar = y_test_bar.cpu().numpy()
                 y_test_hat = y_test_hat.cpu().numpy()
 
@@ -195,7 +204,7 @@ def Training(
     finally :
         print("____________________Training Done!!______________")
         with torch.no_grad() :
-            y_test_hat, y_test_bar, _, = Net(x_test)
+            y_test_hat, y_test_bar, _, _, _ = Net(x_test)
             y_test_bar = y_test_bar.cpu().numpy()
             y_test_hat = y_test_hat.cpu().numpy()
 
@@ -206,36 +215,82 @@ def Training(
 
 
 def Predict(x_pd, best_model=1) :
-    model = AER(x_test.shape(1))
-    model.load_state_dict(torch.load('./model/AER_epochs=100_{}.pth'.format(best_model)))
-    x_pd = torch.tensor(x_pd).cuda()
-    train_loader = Data.DataLoader(dataset=train_data, batch_size=Batch_size, shuffle=True, num_workers=0)
+    x_pd = np.array(x_pd)
 
+    model = AER(in_dims=15)
+    model.load_state_dict(torch.load('./model/AER_epochs=100_{}.pth'.format(best_model)))
+    model.cuda()
+    model.eval()
+    x_pd = torch.tensor(x_pd).cuda()
+    x_pd = x_pd.float()
+    pd_data = Data.TensorDataset(x_pd)
+    pd_loader = Data.DataLoader(dataset=pd_data, batch_size=64, shuffle=True, num_workers=0)
+    prices = []
+    scales = []
+    with torch.no_grad() :
+        for step, data in enumerate(pd_loader) :
+            pd_x = data[0].cuda()
+            y_pd_pr, y_pd, _, _, h = model(pd_x)
+            y_pd = y_pd.cpu().numpy()
+            y_pd_pr = y_pd_pr.cpu().numpy()
+            prices.append(y_pd[0])
+            scales.append(y_pd_pr[0] / y_pd[0])
+    prices = np.array(prices)
+    prices = prices.reshape(1, -1)
+    scales = np.array(scales)
+    scales = scales.reshape(1, -1)
+    return prices, scales
     pass
+
+
 
 
 if __name__ == "__main__" :
     x, y, x_pd = getdata()
 
-    # train 10 times, and get its Avg.
-    R2Pr_list = []
-    R2Pl_list = []
+    Train = False
+    See_list = [i for i in range(20)]
 
-    for sd in range(10) :
+    if Train :
+        # train 10 times, and get its Avg.
+        R2Pr_list = []
+        R2Pl_list = []
 
-        x_train, x_test, y_train, y_test = train_test_split(x, y[0], train_size=0.7, random_state=sd + 1)
-        _, _, y_train1, y_test1 = train_test_split(x, y[1], train_size=0.7, random_state=sd + 1)
-        y_train = np.vstack((y_train, y_train1)).T
-        y_test = np.vstack((y_test, y_test1)).T
-        R2Pr, R2Pl = Training(
-            x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, epochs=100, model_num=sd + 1
-            )
-        R2Pl_list.append(R2Pl)
-        R2Pr_list.append(R2Pr)
+        for sd in range(10) :
 
-    num_model = np.argmax(R2Pl_list)
-    print("Best E2score for Pl:{}".format(R2Pl[num_model]))
-    print("Best E2score for Pr:{}".format(R2Pl[num_model]))
-    Predict(x_pd, num_model.item())
+            x_train, x_test, y_train, y_test = train_test_split(x, y[0], train_size=0.7, random_state=sd + 1)
+            _, _, y_train1, y_test1 = train_test_split(x, y[1], train_size=0.7, random_state=sd + 1)
+            y_train = np.vstack((y_train, y_train1)).T
+            y_test = np.vstack((y_test, y_test1)).T
+            R2Pr, R2Pl = Training(
+                    x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test, epochs=100, model_num=sd + 1
+                    )
+            R2Pl_list.append(R2Pl)
+            R2Pr_list.append(R2Pr)
 
-    # training_model(X1, X2, model1, model2, y, x_pd)
+        num_model = np.argmax(np.array(R2Pl_list))
+        # print(num_model)
+        print("Best R2score for Pl:{}".format(R2Pl_list[num_model]))
+        print("Best R2score for Pr:{}".format(R2Pr_list[num_model]))
+        prices, scales = Predict(x_pd, num_model.item())
+        print("We can see the predicted prices\scales 10 items, index of which are ")
+
+        for j in See_list :
+            print(
+                "No. {} item======>Price:{}========>Suggested Scale-value:{}".format(
+                    j, round(prices[0][j], 2), scales[0][j]
+                    )
+                )
+
+    else :
+        prices, scales = Predict(x_pd, 1)
+        print("We can see the predicted prices\scales 10 items, index of which are ")
+
+        for j in See_list :
+            print(
+                "No. {} item======>Price:{}========>Suggested Scale-value:{}".format(
+                    j, round(prices[0][j], 2), scales[0][j]
+                    )
+                )
+
+        # training_model(X1, X2, model1, model2, y, x_pd)

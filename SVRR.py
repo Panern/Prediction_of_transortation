@@ -200,9 +200,9 @@ def feature_selection(x_, y_):
     print(x_.shape[1]+1)
     Selector1 = ExtraTreesRegressor(n_estimators=50, criterion='squared_error')
     Selector1 = Selector1.fit(x_, y_[0])
-    plt.figure(figsize=(8, 8))
-    plt.ylabel("Importances of features")
-    plt.xticks(np.arange(1, x_.shape[1] + 1), feature_name, rotation=45)
+    plt.figure(figsize=(10, 10))
+    plt.ylabel("Importances of features", fontsize=20)
+    plt.xticks(np.arange(1, x_.shape[1] + 1), feature_name, rotation=45, fontsize=15)
     Im = np.array(Selector1.feature_importances_)
     print("When we focus on the Planned Prices, the order of importances of features is:\n", [(ftt,np.fabs(imp)) for ftt, imp in zip(feature_name[np.argsort(-Im)], np.sort(-Im))])
     plt.bar(np.arange(1, x_.shape[1]+1), Im,  color='red', label="Planned")
@@ -216,14 +216,14 @@ def feature_selection(x_, y_):
 
     Selector2 = ExtraTreesRegressor(n_estimators=50, criterion='squared_error')
     Selector2 = Selector2.fit(x_, y_[1])
-    plt.figure(figsize=(8, 8))
-    plt.ylabel("Importances of features")
+    plt.figure(figsize=(10, 10))
+    plt.ylabel("Importances of features", fontsize=20)
     plt.xticks(np.arange(1, x_.shape[1]+1), feature_name, rotation=45, fontsize=15)
     Im = np.array(Selector2.feature_importances_)
     print("When we focus on the Practical Prices, the order of importances of features is:\n", [(ftt,np.fabs(imp)) for ftt, imp in zip(feature_name[np.argsort(-Im)], np.sort(-Im))])
     plt.bar(np.arange(1, x_.shape[1] + 1), Im, color='red', label="Practical")
     plt.legend()
-    plt.savefig("./re/Importance_Practical.png", dpi=400)
+    plt.savefig("./re/Importance_Practical.png", dpi=500)
     plt.show()
 
     model2 = SelectFromModel(Selector2, prefit=True)
@@ -236,10 +236,10 @@ def feature_selection(x_, y_):
 
 if __name__ == "__main__":
     X1, X2, model1, model2 = feature_selection(x, y)
-    x_train, x_test, y_train, y_test = train_test_split(x, y[1], test_size=0.7)
-    # Training(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test)
-
-    training_model(X1, X2, model1, model2, y, x_pd)
+    # x_train, x_test, y_train, y_test = train_test_split(x, y[1], test_size=0.7)
+    # # Training(x_train=x_train, x_test=x_test, y_train=y_train, y_test=y_test)
+    #
+    # training_model(X1, X2, model1, model2, y, x_pd)
 
 
 

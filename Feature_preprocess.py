@@ -172,7 +172,7 @@ def Observe_data():
     print(len(labels[0]), len(labels[1]))
     print(len(features))
     labels = np.array([list(map(float, labels[0])), list(map(float, labels[1]))])
-    print(labels.shape, test_features.shape)
+    print(features.shape, test_features.shape)
     print(features_name)
     np.save("./data/features_name", features_name)
     np.savetxt("./data/train_features.txt", features, delimiter=',')
@@ -407,4 +407,5 @@ def New_process():
     # print(features, len(features))
 
 
-New_process()
+# New_process()
+Observe_data()
